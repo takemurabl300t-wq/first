@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>きょうのおみくじ</title>
+  <style>
+    :root {
+      --bg: #fbf7f0;
+      --card: #ffffff;
+      --text: #2b2420;
+      --muted: #7a6e66;
+      --accent: #c8102e;
+      --accent-text: #ffffff;
+      --border: #e8ded3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1614;
+        --card: #26201d;
+        --text: #f3ece6;
+        --muted: #a89c93;
+        --accent: #e5484d;
+        --accent-text: #ffffff;
+        --border: #3a312c;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px 16px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+    }
+    main {
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin: 0 0 4px;
+    }
+    .date {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin: 0 0 24px;
+    }
+    .slip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 6px solid var(--accent);
+      border-radius: 8px;
+      padding: 28px 20px;
+      min-height: 260px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+    .slip.shake { animation: shake 0.5s; }
+    @keyframes shake {
+      0%, 100% { transform: rotate(0); }
+      25% { transform: rotate(-4deg); }
+      75% { transform: rotate(4deg); }
+    }
+    .rank {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0;
+      letter-spacing: 0.1em;
+    }
+    .message { margin: 0; line-height: 1.7; }
+    .lucky {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .hint { color: var(--muted); margin: 0; }
+    button {
+      margin-top: 24px;
+      width: 100%;
+      padding: 14px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      font-family: inherit;
+      color: var(--accent-text);
+      background: var(--accent);
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    button:active { transform: scale(0.98); }
+    button:disabled { opacity: 0.6; cursor: default; }
+    @media (prefers-reduced-motion: reduce) {
+      .slip.shake { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>きょうのおみくじ</h1>
+    <p class="date" id="date"></p>
+
+    <div class="slip" id="slip" aria-live="polite">
+      <p class="hint">ボタンを押して、おみくじを引いてください</p>
+    </div>
+
+    <button id="draw" type="button">おみくじを引く</button>
+  </main>
+
+  <script>
+    // 運勢ごとの出やすさ（weight が大きいほど出やすい）
+    const fortunes = [
+      { rank: "大吉", weight: 1, messages: ["何をやってもうまくいく日。思い切って挑戦しよう！", "最高の一日になりそう。周りの人にも優しくね。"] },
+      { rank: "中吉", weight: 2, messages: ["いいことが起こりそうな予感。笑顔でいこう。", "がんばったぶんだけ、ちゃんと返ってくる日。"] },
+      { rank: "小吉", weight: 3, messages: ["小さな幸せを見つけられる日。", "のんびりペースでちょうどいい。"] },
+      { rank: "吉",   weight: 3, messages: ["いつも通りがいちばん。", "新しいことを少しだけ試してみよう。"] },
+      { rank: "末吉", weight: 2, messages: ["今日は準備の日。明日に向けて力をためよう。", "あせらずゆっくり進めば大丈夫。"] },
+      { rank: "凶",   weight: 1, messages: ["今日は慎重に。でも、ここから上がるだけ！", "忘れ物に注意。出かける前にもう一度確認しよう。"] },
+    ];
+    const luckyItems = ["おにぎり", "青いペン", "ハンカチ", "温かいお茶", "スニーカー", "チョコレート", "ノート", "傘"];
+    const luckyColors = ["赤", "青", "緑", "黄色", "白", "むらさき", "オレンジ", "ピンク"];
+
+    const pick = (list) => list[Math.floor(Math.random() * list.length)];
+
+    function pickFortune() {
+      const total = fortunes.reduce((sum, f) => sum + f.weight, 0);
+      let r = Math.random() * total;
+      for (const f of fortunes) {
+        r -= f.weight;
+        if (r < 0) return f;
+      }
+      return fortunes[fortunes.length - 1];
+    }
+
+    const slip = document.getElementById("slip");
+    const button = document.getElementById("draw");
+
+    document.getElementById("date").textContent =
+      new Date().toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "short" });
+
+    button.addEventListener("click", () => {
+      button.disabled = true;
+      slip.innerHTML = '<p class="hint">ガラガラ……</p>';
+      slip.classList.remove("shake");
+      void slip.offsetWidth; // アニメーションをやり直すため
+      slip.classList.add("shake");
+
+      setTimeout(() => {
+        const f = pickFortune();
+        slip.innerHTML = `
+          <p class="rank">${f.rank}</p>
+          <p class="message">${pick(f.messages)}</p>
+          <p class="lucky">ラッキーアイテム：${pick(luckyItems)}<br>ラッキーカラー：${pick(luckyColors)}</p>
+        `;
+        button.textContent = "もう一度引く";
+        button.disabled = false;
+      }, 600);
+    });
+  </script>
+</body>
+</html>
